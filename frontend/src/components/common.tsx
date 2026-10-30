@@ -1,12 +1,41 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ContractView, DocSummary } from "../api";
 import { fmtDate } from "../api";
 
-/** Подсказка к термину: «?» с всплывающим пояснением (hover и фокус с клавиатуры). */
+const TIP_W = 280;
+
+/** Подсказка к термину: «?» с пояснением при наведении и фокусе с клавиатуры.
+ *  Рендерится порталом в body с position: fixed — иначе её обрезают ячейки
+ *  таблицы (overflow: hidden) и прокручиваемый контейнер. */
 export function Hint({ text }: { text: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number; up: boolean } | null>(null);
+  const show = () => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    const left = Math.min(Math.max(8, r.left + r.width / 2 - TIP_W / 2), window.innerWidth - TIP_W - 8);
+    const up = r.bottom + 140 > window.innerHeight; // у нижнего края — показываем над значком
+    setPos({ left, top: up ? r.top - 6 : r.bottom + 6, up });
+  };
+  const hide = () => setPos(null);
+  useEffect(() => {
+    if (!pos) return;
+    window.addEventListener("scroll", hide, true);
+    return () => window.removeEventListener("scroll", hide, true);
+  }, [pos]);
   return (
-    <span className="hint" tabIndex={0} role="note" aria-label={text}>
-      ?<span className="tip" aria-hidden="true">{text}</span>
+    <span ref={ref} className="hint" tabIndex={0} role="note" aria-label={text}
+      onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}
+      onClick={(e) => e.stopPropagation()}>
+      ?
+      {pos && createPortal(
+        <span className="tip" aria-hidden="true"
+          style={{ left: pos.left, top: pos.top, width: TIP_W, transform: pos.up ? "translateY(-100%)" : undefined }}>
+          {text}
+        </span>,
+        document.body,
+      )}
     </span>
   );
 }
