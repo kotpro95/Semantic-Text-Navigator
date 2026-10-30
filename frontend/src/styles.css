@@ -276,3 +276,5 @@ table.grid { border-collapse: separate; border-spacing: 0; width: 100%; table-la
 .llm-box .st i { margin-top: 4px; }
 .cite { flex-wrap: wrap; }
 .cite q { min-width: 0; }
+/* тёмная тема: элемент «засвечивается», фон гаснет сильнее */
+:root[data-theme="dark"] .tour-spot { background: rgba(255, 255, 255, .10); box-shadow: 0 0 0 9999px rgba(0, 0, 0, .78), 0 0 28px 6px rgba(255, 90, 26, .45); }
