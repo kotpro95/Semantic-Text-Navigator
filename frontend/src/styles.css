@@ -251,7 +251,7 @@ table.grid { border-collapse: separate; border-spacing: 0; width: 100%; table-la
 /* Тур: затемнение с «окном» вокруг элемента, анимированный курсор, карточка */
 .tour { position: fixed; inset: 0; z-index: 200; pointer-events: none; }
 .tour-catch { position: fixed; inset: 0; pointer-events: auto; }
-.tour-spot { position: fixed; pointer-events: none; box-shadow: 0 0 0 9999px rgba(10, 10, 10, .62); outline: 2px solid var(--signal-mark); outline-offset: 0;
+.tour-spot { position: fixed; pointer-events: none; box-shadow: 0 0 0 9999px rgba(10, 10, 10, .62); outline: 2px solid var(--signal-mark); outline-offset: -2px; /* рамка внутри границ элемента */
   transition: left .45s cubic-bezier(.22,.8,.3,1), top .45s cubic-bezier(.22,.8,.3,1), width .45s cubic-bezier(.22,.8,.3,1), height .45s cubic-bezier(.22,.8,.3,1); }
 .tour-cursor { position: fixed; left: 0; top: 0; z-index: 202; pointer-events: none; transition: transform .7s cubic-bezier(.22,.8,.3,1); filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
 .tour-cursor svg { display: block; transition: transform .15s; }

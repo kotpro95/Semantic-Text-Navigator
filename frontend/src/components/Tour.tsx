@@ -82,7 +82,6 @@ const STEPS: Step[] = [
 ];
 
 type Rect = { x: number; y: number; w: number; h: number };
-const PAD = 6;
 
 export function Tour({ open, onClose, api }: { open: boolean; onClose: () => void; api: TourApi }) {
   const [i, setI] = useState(0);
@@ -100,7 +99,8 @@ export function Tour({ open, onClose, api }: { open: boolean; onClose: () => voi
     const el = elRef.current;
     if (!el) return setRect(null);
     const r = el.getBoundingClientRect();
-    setRect({ x: r.left - PAD, y: r.top - PAD, w: r.width + PAD * 2, h: r.height + PAD * 2 });
+    // подсветка ровно по границам элемента, рамка внутри — не налезает на соседей и края экрана
+    setRect({ x: r.left, y: r.top, w: r.width, h: r.height });
   }, []);
 
   useEffect(() => { if (open) setI(0); }, [open]);
