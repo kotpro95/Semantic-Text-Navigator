@@ -26,7 +26,7 @@ def supplier(doc: Document, paras: list[Paragraph]) -> Extracted:
 
 
 # ---------- сумма договора ----------
-AMOUNT_TRIGGER = re.compile(r"(общ\w+|итогов\w+)\s+стоимост\w*|цена\s+договора", re.I)
+AMOUNT_TRIGGER = re.compile(r"(общ\w+|итогов\w+)\s+стоимост\w*|(цен\w*|сумм\w*|стоимост\w*)\s+договора", re.I)
 AMOUNT_NOT_PRICE = {
     "аванс": "это авансовый платёж, а не стоимость договора",
     "лимит": "это бюджетный лимит, а не согласованная стоимость",
@@ -73,7 +73,8 @@ def amount(doc: Document, paras: list[Paragraph]) -> Extracted:
 
 # ---------- срок поставки ----------
 DELIVERY_TRIGGER = re.compile(r"\bпостав\w*", re.I)
-DEADLINE_RE = re.compile(r"не\s+позднее\s+(\d{2}\.\d{2}\.\d{4})", re.I)
+# «не позднее 15.04.2026», «в срок до 15.04.2026», «до 15.04.2026»
+DEADLINE_RE = re.compile(r"(?:не\s+позднее|\bдо)\s+(\d{2}\.\d{2}\.\d{4})", re.I)
 DELIVERY_NOT = {"оплат": "это срок оплаты, а не поставки", "приемк": "это дата приёмки", "приёмк": "это дата приёмки"}
 
 

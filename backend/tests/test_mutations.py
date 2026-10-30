@@ -105,3 +105,63 @@ def test_orphan_document_is_flagged(texts):
     texts["09_letter.txt"] = texts["05_supplier_email.txt"].replace("STN-102", "STN-999")
     _, flags, _ = run(texts)
     assert any("STN-999" in f.text for f in flags)
+
+
+# --- устойчивость к формулировкам «того же общего формата» ---
+import pytest  # noqa: E402
+
+FORMAT_BASE = NEW_CONTRACT.split("2.1.")[0]
+
+
+def _one(amount_line: str, delivery_line: str):
+    text = FORMAT_BASE + f"2.1. {amount_line}\n\n3.1. {delivery_line}\n"
+    v, _, _ = run({"x.txt": text})
+    return v["STN-104"].fields
+
+
+@pytest.mark.parametrize("line,value,display", [
+    ("Общая стоимость поставки составляет 2 450 500,00 рублей, включая НДС.", "2450500", "2 450 500"),
+    ("Общая стоимость поставки составляет 2 450 500,50 руб., включая НДС.", "2450500.50", "2 450 500,50"),
+    ("Общая стоимость поставки составляет 2 450 500 ₽, включая НДС.", "2450500", "2 450 500"),
+    ("Цена договора составляет 2 450 500 рублей.", "2450500", "2 450 500"),
+    ("Сумма договора составляет 2 450 500 рублей.", "2450500", "2 450 500"),
+    ("Стоимость договора составляет 2 450 500 рублей.", "2450500", "2 450 500"),
+])
+def test_amount_phrasings(line, value, display):
+    f = _one(line, "Поставщик обязуется поставить продукцию не позднее 25.03.2026.")["amount"]
+    assert (f.value, f.display) == (value, display)
+
+
+@pytest.mark.parametrize("line", [
+    "Поставщик обязуется поставить продукцию не позднее 25.03.2026.",
+    "Поставщик обязуется поставить продукцию в срок до 25.03.2026.",
+    "Срок поставки — не позднее 25.03.2026 г.",
+])
+def test_delivery_phrasings(line):
+    assert _one("Общая стоимость поставки составляет 100 000 рублей.", line)["delivery"].value == "2026-03-25"
+
+
+def test_payment_until_is_not_delivery():
+    f = _one("Общая стоимость поставки составляет 100 000 рублей.",
+             "Оплата производится до 10.04.2026. Поставщик обязуется поставить продукцию до 25.03.2026.")["delivery"]
+    assert f.value == "2026-03-25"
+    assert any(r.display == "10.04.2026" for r in f.rejected)
+
+
+def test_delivery_schedule_in_annex_is_no_data():
+    f = _one("Общая стоимость поставки составляет 100 000 рублей.", "Срок поставки определяется графиком в приложении № 2.")["delivery"]
+    assert f.value is None and f.status == FieldStatus.missing
+
+
+def test_crlf_and_bom():
+    v, _, _ = run({"x.txt": "﻿" + NEW_CONTRACT.replace("\n", "\r\n")})
+    assert v["STN-104"].fields["amount"].value == "2450500"
+
+
+def test_signed_amendment_with_change_phrase():
+    amend = ("ДОПОЛНИТЕЛЬНОЕ СОГЛАШЕНИЕ № 1 К ДОГОВОРУ STN-104\nДата: 05.03.2026\n"
+             "Статус: подписано обеими сторонами 05.03.2026.\n1. Срок поставки изменить на 15.04.2026.\n"
+             "2. Настоящее соглашение вступает в силу с 05.03.2026.\n")
+    v, _, _ = run({"c.txt": NEW_CONTRACT, "a.txt": amend})
+    f = v["STN-104"].fields["delivery"]
+    assert f.value == "2026-04-15" and f.status == FieldStatus.changed

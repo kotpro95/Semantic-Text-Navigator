@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import re
 from datetime import date
+from decimal import Decimal
 
 from ..models import Paragraph
 
 CLAUSE_RE = re.compile(r"^(\d+(?:\.\d+)*)\.\s")
 DATE_RE = re.compile(r"\b(\d{2})\.(\d{2})\.(\d{4})\b")
-# 1 200 000 / 1 200 000 / 840000, необязательная пропись в скобках, затем «руб»
-MONEY_RE = re.compile(r"(\d{1,3}(?:[  ]\d{3})+|\d{4,})\s*(?:\([^)]*\)\s*)?(?:руб|₽)", re.I)
+# 1 200 000 / 1 200 000 / 840000, необязательные копейки «,00», пропись в скобках, затем «руб» / «₽»
+MONEY_RE = re.compile(r"(\d{1,3}(?:[  ]\d{3})+|\d{4,})(?:[,.](\d{2}))?\s*(?:\([^)]*\)\s*)?(?:руб|₽)", re.I)
 # Предложение заканчивается точкой перед пробелом и заглавной буквой/кавычкой/цифрой,
 # но не внутри даты "15.04.2026" и не в номере пункта "2.1."
 SENTENCE_END_RE = re.compile(r"(?<=[.!?»])\s+(?=[А-ЯЁA-Z«\d])")
@@ -62,15 +63,20 @@ def all_dates(s: str) -> list[date]:
     return out
 
 
-def parse_money(s: str) -> int | None:
+def parse_money(s: str) -> Decimal | None:
+    """Сумма в рублях; копейки сохраняются, «,00» отбрасывается: 2 450 500,00 → 2450500."""
     m = MONEY_RE.search(s)
     if not m:
         return None
-    return int(re.sub(r"\D", "", m.group(1)))
+    v = Decimal(re.sub(r"\D", "", m.group(1)) + "." + (m.group(2) or "00"))
+    return v.quantize(Decimal(1)) if v == v.to_integral_value() else v
 
 
-def fmt_money(v: int) -> str:
-    return f"{v:,}".replace(",", " ")
+def fmt_money(v: Decimal | int) -> str:
+    v = Decimal(v)
+    whole = f"{int(v):,}".replace(",", " ")
+    frac = v - int(v)
+    return whole if not frac else f"{whole},{str(frac.quantize(Decimal('0.01')))[2:]}"
 
 
 def fmt_date(d: date) -> str:
