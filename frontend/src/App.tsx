@@ -109,7 +109,8 @@ export default function App() {
             {menu === "docs" && <DocsMenu docs={docs} asOf={asOf} onFiles={onFiles} onRemove={removeDoc} onClear={clearAll} />}
           </div>
         )}
-        <button className="btn primary" onClick={topDrop.pick} disabled={busy}>{busy ? "Загрузка…" : "Загрузить TXT"}</button>
+        {/* на стартовом экране загрузка уже в центре — в шапке не дублируем */}
+        {docs.length > 0 && <button className="btn primary" onClick={topDrop.pick} disabled={busy}>{busy ? "Загрузка…" : "Загрузить TXT"}</button>}
         {topDrop.picker}
       </header>
       {err && <div className="answer"><span className="err" role="alert">{err}</span></div>}
