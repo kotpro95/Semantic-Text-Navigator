@@ -1,7 +1,7 @@
 import { Fragment, useRef, useState } from "react";
-import type { Answer, DocSummary, Evidence } from "../api";
+import type { Answer, DocSummary, Evidence, LlmStatus } from "../api";
 import { api, fmtDate } from "../api";
-import { docStatus } from "./common";
+import { Hint, docStatus } from "./common";
 import type { Focus } from "./DataTable";
 
 export function useFileDrop(onFiles: (f: File[]) => void) {
@@ -90,7 +90,7 @@ export function AskBar({ asOf, onOpen }: { asOf: string; onOpen: (f: Focus) => v
 
   return (
     <>
-      <form className="ask" onSubmit={(e) => { e.preventDefault(); run(q); }}>
+      <form className="ask" data-tour="ask" onSubmit={(e) => { e.preventDefault(); run(q); }}>
         <label htmlFor="ask" className="ask-label">
           Спросите по загруженным договорам
           <span>ответ строится по документам и приходит с цитатой-основанием</span>
@@ -137,5 +137,32 @@ export function AskBar({ asOf, onOpen }: { asOf: string; onOpen: (f: Focus) => v
         </div>
       )}
     </>
+  );
+}
+
+/** Переключатель LLM-сверки (Ollama). Выключен по умолчанию; без Ollama неактивен с объяснением. */
+export function LlmSwitch({ status, onChange }: { status: LlmStatus; onChange: (on: boolean) => void }) {
+  const p = status.progress;
+  const busy = status.enabled && p && p.pending > 0;
+  const off = !status.available && !status.enabled;
+  const hint = off
+    ? `${status.reason ?? "Ollama недоступна"}. Установка: ollama.com, затем «ollama pull ${status.model}».`
+    : `Локальная модель ${status.model} перепроверяет сумму и срок по тексту договора. Ответ принимается только с дословной цитатой; расхождение — «Проверить».`;
+  return (
+    <span className="llm-switch">
+      <button role="switch" aria-checked={status.enabled} className={`sw ${status.enabled ? "on" : ""}`}
+        disabled={off} onClick={() => onChange(!status.enabled)} title={hint}>
+        <span className="knob" aria-hidden="true" />
+        LLM-сверка
+      </button>
+      <span className="llm-state">
+        {off ? (status.reason?.startsWith("Модель") ? "модель не скачана" : "Ollama не запущена")
+          : !status.enabled ? status.model
+          : busy ? `проверяет ${p!.done}/${p!.total}…`
+          : p && p.errors ? `${status.model} · ошибок ${p.errors}`
+          : `${status.model} · готово`}
+      </span>
+      <Hint text={hint} />
+    </span>
   );
 }

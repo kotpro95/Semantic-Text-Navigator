@@ -56,6 +56,34 @@ def _decode(raw: bytes, name: str) -> str:
     raise HTTPException(400, f"{name}: не удалось прочитать как UTF-8 или Windows-1251")
 
 
+def _views(as_of: date):
+    """Реестр на дату + результат LLM-сверки (если переключатель включён)."""
+    views, flags = build_registry(store.all(), as_of)
+    docs = [store.get(v.doc_id) for v in views]
+    llm.ensure([d for d in docs if d])
+    for v, d in zip(views, docs):
+        if d:
+            llm.apply(v, d)
+    return views, flags
+
+
+class LlmToggle(BaseModel):
+    enabled: bool
+
+
+@router.get("/llm")
+def llm_status():
+    return llm.status()
+
+
+@router.post("/llm")
+def llm_toggle(body: LlmToggle):
+    try:
+        return llm.set_enabled(body.enabled)
+    except RuntimeError as e:
+        raise HTTPException(409, str(e))
+
+
 @router.post("/documents", response_model=list[DocSummary])
 async def upload(files: list[UploadFile] = File(...)):
     out = []
@@ -103,15 +131,15 @@ def clear_documents():
 
 @router.get("/registry", response_model=Registry)
 def registry(as_of: date = Query(DEFAULT_AS_OF)):
-    views, flags = build_registry(store.all(), as_of)
+    views, flags = _views(as_of)
     return Registry(as_of=as_of, contracts=views, flags=flags,
                     fields=[{"name": s.name, "label": s.label, "in_registry": s.in_registry} for s in REGISTRY.values()],
-                    documents=[DocSummary.of(d) for d in store.all()], llm=llm.status())
+                    documents=[DocSummary.of(d) for d in store.all()], llm=llm.status([v.doc_id for v in views]))
 
 
 @router.get("/contracts/{number}", response_model=ContractView)
 def contract(number: str, as_of: date = Query(DEFAULT_AS_OF)):
-    views, _ = build_registry(store.all(), as_of)
+    views, _ = _views(as_of)
     v = next((v for v in views if v.number.upper() == number.upper()), None)
     if not v:
         raise HTTPException(404, f"Договор {number} не загружен")
@@ -122,7 +150,7 @@ def contract(number: str, as_of: date = Query(DEFAULT_AS_OF)):
 def query(type: str = Query(..., pattern="^(field|delivery_before)$"),
           contract: str | None = None, field: str | None = None,
           date_: date | None = Query(None, alias="date"), as_of: date = Query(DEFAULT_AS_OF)):
-    views, _ = build_registry(store.all(), as_of)
+    views, _ = _views(as_of)
     if type == "field":
         if not contract or field not in REGISTRY:
             raise HTTPException(400, f"Нужны contract и field ∈ {list(REGISTRY)}")
@@ -138,21 +166,12 @@ def ask(q: str, as_of: date = Query(DEFAULT_AS_OF)):
     if p["type"] == "delivery_before":
         if not p["date"]:
             raise HTTPException(422, "Укажите дату: «раньше 1 апреля 2026»")
-        views, _ = build_registry(store.all(), as_of)
+        views, _ = _views(as_of)
         a = delivery_before(views, p["date"], as_of)
     else:
         if not p["contract"] or not p["field"]:
             raise HTTPException(422, "Не понял вопрос. Укажите номер договора и поле: сумма, срок поставки, неустойка, поставщик")
-        views, _ = build_registry(store.all(), p["as_of"])
+        views, _ = _views(p["as_of"])
         a = field_answer(views, p["contract"], p["field"], p["as_of"])
     a.question = q
     return a
-
-
-@router.get("/contracts/{number}/llm-check")
-def llm_check(number: str, as_of: date = Query(DEFAULT_AS_OF)):
-    views, _ = build_registry(store.all(), as_of)
-    v = next((v for v in views if v.number.upper() == number.upper()), None)
-    if not v:
-        raise HTTPException(404, f"Договор {number} не загружен")
-    return llm.cross_check(v, store.get(v.doc_id))

@@ -123,6 +123,26 @@ export function SourceDrawer({ focus, contract, asOf, onClose, onFocus }: {
           <div className="legend"><span>▮ цитата-основание</span><span>▮ статус и дата вступления (серым)</span></div>
         </div>
 
+        {field?.llm && contract && (
+          <div className="llm-box">
+            <span className="kick">Сверка LLM</span>
+            <span className={`st ${field.llm.verdict === "agree" ? "pending" : field.llm.verdict === "pending" ? "ok" : "review"}`} style={{ fontWeight: 400 }}>
+              <i aria-hidden="true" style={field.llm.verdict === "agree" ? { background: "var(--ink)" } : undefined} />{field.llm.note}
+            </span>
+            {field.llm.quote && (
+              <div className="cite">
+                <q>{field.llm.quote}</q>
+                {field.llm.paragraph && (
+                  <button className="linkbtn" onClick={() => onFocus({ ...focus, evidence: { doc_id: contract.doc_id, filename: contract.filename, paragraph: field.llm!.paragraph!, quote: field.llm!.quote!, doc_label: contract.number } })}>
+                    {contract.filename} · абз. {field.llm.paragraph}
+                  </button>
+                )}
+              </div>
+            )}
+            <span className="muted" style={{ fontSize: 11.5 }}>Модель читает только текст договора; ответ принимается, если цитата дословно есть в тексте.</span>
+          </div>
+        )}
+
         {field && field.rejected.length > 0 && (
           <div className="rej">
             <span className="kick">Найдено в тексте, но не принято</span>

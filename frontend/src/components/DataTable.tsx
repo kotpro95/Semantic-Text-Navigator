@@ -24,13 +24,23 @@ type Col = {
   text: (r: Row) => string; // для title / экспорта
 };
 
+// метка LLM-сверки у значения: подтверждено / расходится / найдено моделью / ещё проверяется
+const LLM_TAG: Record<string, [string, string] | undefined> = {
+  agree: ["llm", "LLM ✓"], disagree: ["pending", "LLM ≠"], filled: ["pending", "LLM"], pending: ["llm", "LLM…"],
+};
+function llmTag(f: FieldView) {
+  const t = f.llm && LLM_TAG[f.llm.verdict];
+  return t ? <span className={`tag ${t[0]}`} title={f.llm!.note}>{t[1]}</span> : null;
+}
+
 function fieldCell(f: FieldView | undefined) {
-  if (!f || f.status === "missing") return <span className="nd">нет данных</span>;
+  if (!f || f.status === "missing") return <><span className="nd">нет данных</span>{f && llmTag(f)}</>;
   return (
     <>
       {f.display}
       {f.status === "changed" && f.changed_by && <span className="tag ok" title={`Изменено: ${f.changed_by}`}>{shortDoc(f.changed_by).replace("ДС № ", "ДС")}</span>}
-      {f.status === "review" && <span className="tag pending" title={f.note ?? ""}>?</span>}
+      {f.status === "review" && !f.llm && <span className="tag pending" title={f.note ?? ""}>?</span>}
+      {llmTag(f)}
     </>
   );
 }
@@ -41,8 +51,8 @@ const fieldText = (f: FieldView | undefined) => (!f || f.status === "missing" ? 
 export const COLUMNS: Col[] = [
   { id: "number", label: "Договор", width: 104, sort: (r) => r.c.number, render: (r) => numCell(r.c.number), text: (r) => r.c.number },
   { id: "supplier", label: "Поставщик", width: 200, field: "supplier", sort: (r) => r.c.fields.supplier.display ?? "", render: (r) => fieldCell(r.c.fields.supplier), text: (r) => fieldText(r.c.fields.supplier) },
-  { id: "amount", label: "Сумма, ₽ с НДС", hint: TERMS.amount, width: 150, align: "r", field: "amount", sort: (r) => Number(r.c.fields.amount.value ?? -1), render: (r) => fieldCell(r.c.fields.amount), text: (r) => fieldText(r.c.fields.amount) },
-  { id: "delivery", label: "Срок поставки", hint: TERMS.delivery, width: 140, align: "r", field: "delivery", sort: (r) => r.c.fields.delivery.value ?? "9999", render: (r) => fieldCell(r.c.fields.delivery), text: (r) => fieldText(r.c.fields.delivery) },
+  { id: "amount", label: "Сумма, ₽ с НДС", hint: TERMS.amount, width: 185, align: "r", field: "amount", sort: (r) => Number(r.c.fields.amount.value ?? -1), render: (r) => fieldCell(r.c.fields.amount), text: (r) => fieldText(r.c.fields.amount) },
+  { id: "delivery", label: "Срок поставки", hint: TERMS.delivery, width: 175, align: "r", field: "delivery", sort: (r) => r.c.fields.delivery.value ?? "9999", render: (r) => fieldCell(r.c.fields.delivery), text: (r) => fieldText(r.c.fields.delivery) },
   { id: "status", label: "Статус", width: 150, sort: (r) => ["review", "pending", "ok"].indexOf(r.status), render: (r) => <StatusLabel s={r.status} />, text: (r) => STATUS[r.status].label },
   { id: "pending", label: "Не согласовано", hint: TERMS.pending, width: 260, sort: (r) => r.pendingText, render: (r) => r.pendingText ? <span style={{ color: "var(--pending)" }}>{r.pendingText}</span> : <span className="muted">—</span>, text: (r) => r.pendingText },
   { id: "review", label: "Проверить", hint: TERMS.review, width: 240, sort: (r) => r.reviewText, render: (r) => r.reviewText ? <span style={{ color: "var(--signal)" }}>{r.reviewText}</span> : <span className="muted">—</span>, text: (r) => r.reviewText },
@@ -148,7 +158,7 @@ export function DataTable({ rows, order, hidden, focus, onOpen }: {
   });
 
   return (
-    <div className="grid-wrap" ref={wrap} tabIndex={0} onKeyDown={onKey} aria-label="Реестр договоров. Стрелки — перемещение, Enter — открыть основание">
+    <div className="grid-wrap" data-tour="table" ref={wrap} tabIndex={0} onKeyDown={onKey} aria-label="Реестр договоров. Стрелки — перемещение, Enter — открыть основание">
       <table className="grid" role="grid" aria-rowcount={sorted.length}>
         {/* последняя колонка без ширины — забирает остаток экрана, пока её не растянули вручную */}
         <colgroup>{visible.map((c, i) => <col key={c.id} style={{ width: widths[c.id] ?? (i === visible.length - 1 ? undefined : c.width) }} />)}</colgroup>

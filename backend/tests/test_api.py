@@ -64,7 +64,9 @@ def test_structured_query():
     assert [m["contract"] for m in r["matches"]] == ["STN-102"]
 
 
-def test_llm_disabled_by_default():
-    _upload_all()
-    r = client.get("/api/contracts/STN-101/llm-check").json()
-    assert r["enabled"] is False
+def test_llm_toggle_off_by_default_and_409_when_unavailable(monkeypatch):
+    from app import llm
+    monkeypatch.setattr(llm, "availability", lambda: {"available": False, "reason": "Ollama не запущена"})
+    assert client.get("/api/llm").json()["enabled"] is False
+    r = client.post("/api/llm", json={"enabled": True})
+    assert r.status_code == 409 and "Ollama" in r.json()["detail"]

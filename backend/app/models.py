@@ -113,6 +113,16 @@ class FieldView(BaseModel):
     note: Optional[str] = None
     history: list[HistoryStep] = Field(default_factory=list)
     rejected: list[Rejected] = Field(default_factory=list)
+    llm: Optional["LlmCheck"] = None
+
+
+class LlmCheck(BaseModel):
+    """Сверка поля локальной LLM (Ollama) с правилами. Только по тексту договора."""
+    verdict: str                     # agree | disagree | filled | rejected | not_found
+    display: Optional[str] = None    # что нашла модель
+    quote: Optional[str] = None      # цитата модели (принимается, только если дословно есть в тексте)
+    paragraph: Optional[int] = None
+    note: str = ""
 
 
 class PendingChange(BaseModel):
@@ -140,3 +150,6 @@ class ContractView(BaseModel):
     pending: list[PendingChange] = Field(default_factory=list)
     flags: list[Flag] = Field(default_factory=list)
     related_docs: list[str] = Field(default_factory=list)
+
+
+FieldView.model_rebuild()

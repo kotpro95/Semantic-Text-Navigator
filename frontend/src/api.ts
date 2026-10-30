@@ -8,6 +8,15 @@ export type FieldStatus = "ok" | "changed" | "missing" | "review";
 export type FieldView = {
   field: string; label: string; value: string | null; display: string | null; status: FieldStatus;
   evidence: Evidence[]; changed_by: string | null; note: string | null; history: HistoryStep[]; rejected: Rejected[];
+  llm: LlmCheck | null;
+};
+export type LlmCheck = {
+  verdict: "agree" | "disagree" | "filled" | "rejected" | "not_found" | "pending" | "error";
+  display: string | null; quote: string | null; paragraph: number | null; note: string;
+};
+export type LlmStatus = {
+  enabled: boolean; available: boolean; reason: string | null; model: string; url: string;
+  progress?: { total: number; done: number; pending: number; errors: number };
 };
 export type PendingChange = {
   field: string; label: string; current_display: string | null; proposed_display: string;
@@ -25,7 +34,7 @@ export type DocSummary = {
 };
 export type Registry = {
   as_of: string; fields: { name: string; label: string; in_registry: boolean }[];
-  contracts: ContractView[]; flags: Flag[]; documents: DocSummary[]; llm: { enabled: boolean; model: string | null };
+  contracts: ContractView[]; flags: Flag[]; documents: DocSummary[]; llm: LlmStatus;
 };
 export type Paragraph = { n: number; clause: string | null; text: string };
 export type DocumentFull = DocSummary & {
@@ -61,6 +70,7 @@ export const api = {
   document: (id: string) => req<DocumentFull>(`/api/documents/${id}`),
   remove: (id: string) => req(`/api/documents/${id}`, { method: "DELETE" }),
   clear: () => req("/api/documents", { method: "DELETE" }),
+  setLlm: (enabled: boolean) => req<LlmStatus>("/api/llm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }) }),
   ask: (q: string, asOf: string) => req<Answer>(`/api/ask?q=${encodeURIComponent(q)}&as_of=${asOf}`),
 };
 

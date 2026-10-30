@@ -3,8 +3,9 @@ import type { DocSummary, Registry } from "./api";
 import { api, fmtDate } from "./api";
 import { Confirm, Hint, TERMS, useStored, type ConfirmState } from "./components/common";
 import { ColumnsMenu, DEFAULT_HIDDEN, DEFAULT_ORDER, DataTable, toRows, type Focus } from "./components/DataTable";
-import { AskBar, DocsMenu, useFileDrop } from "./components/Panels";
+import { AskBar, DocsMenu, LlmSwitch, useFileDrop } from "./components/Panels";
 import { SourceDrawer } from "./components/SourceDrawer";
+import { Tour, type TourApi } from "./components/Tour";
 
 type View = "all" | "review" | "pending";
 type Filter = { view: View; before: string | null; q: string };
@@ -17,7 +18,7 @@ function Empty({ onFiles, onSamples, busy }: { onFiles: (f: File[]) => void; onS
       <div className="blk">
         <h2>Загрузите договоры и связанные документы</h2>
         <p>Договоры, допсоглашения, письма поставщиков, проекты изменений — TXT, сразу несколько. Тип и статус каждого документа определяются по тексту.</p>
-        <div className={`drop ${drop.over ? "over" : ""}`} {...drop.props}>
+        <div className={`drop ${drop.over ? "over" : ""}`} {...drop.props} data-tour="upload">
           <span>Перетащите TXT-файлы сюда</span>
           <div className="row">
             <button className="btn primary" onClick={drop.pick} disabled={busy}>Выбрать файлы</button>
@@ -45,11 +46,29 @@ export default function App() {
   const [filter, setFilter] = useState<Filter>({ view: "all", before: null, q: "" });
   const [saved, setSaved] = useStored<Saved[]>("tbl.saved", []);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [theme, setTheme] = useStored<"light" | "dark">("ui.theme",
+    typeof matchMedia !== "undefined" && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
+  const [tour, setTour] = useState(false);
+  const regRef = useRef<Registry | null>(null);
+  regRef.current = reg;
 
   const load = useCallback(() => {
     api.registry(asOf).then((r) => { setReg(r); setErr(null); }).catch((e) => setErr(e.message));
   }, [asOf]);
   useEffect(load, [load]);
+  // тур сам запускается при первом визите; повторно — кнопкой «Как пользоваться»
+  useEffect(() => {
+    if (!reg) return;
+    try { if (!localStorage.getItem("tour.seen")) setTour(true); } catch { /* */ }
+  }, [reg !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+  // пока LLM проверяет договоры в фоне — обновляем реестр раз в 2 с
+  useEffect(() => {
+    const p = reg?.llm.progress;
+    if (!reg?.llm.enabled || !p || p.pending === 0) return;
+    const t = setTimeout(load, 2000);
+    return () => clearTimeout(t);
+  }, [reg, load]);
   useEffect(() => {
     const h = (e: MouseEvent) => { if (menu && !(e.target as HTMLElement).closest(".pop-anchor")) setMenu(null); };
     document.addEventListener("mousedown", h);
@@ -70,6 +89,13 @@ export default function App() {
     title: "Убрать все документы?", text: "Реестр станет пустым, документы придётся загрузить заново.",
     action: "Убрать все", run: () => { setFocus(null); act(api.clear()); },
   }); };
+
+  const tourApi: TourApi = {
+    hasDocs: () => (regRef.current?.documents.length ?? 0) > 0,
+    loadSamples: async () => { await api.samples(); const r = await api.registry(asOf); setReg(r); },
+    openDocs: () => setMenu("docs"),
+    closeAll: () => { setMenu(null); setFocus(null); setConfirm(null); },
+  };
 
   const registryFields = useMemo(() => (reg?.fields ?? []).filter((f) => f.in_registry).map((f) => f.name), [reg]);
   const allRows = useMemo(() => toRows(reg?.contracts ?? [], registryFields), [reg, registryFields]);
@@ -95,14 +121,20 @@ export default function App() {
   return (
     <div className={density}>
       <header className="top">
-        <h1>Сверка договоров поставки</h1>
-        <label className="field">Дата проверки
+        <h1 data-tour="title">Сверка договоров поставки</h1>
+        <label className="field" data-tour="asof">Дата проверки
           <input className="input mono" type="date" value={asOf} onChange={(e) => e.target.value && setAsOf(e.target.value)} />
           <Hint text={TERMS.asOf} />
         </label>
+        {reg && <span data-tour="llm"><LlmSwitch status={reg.llm} onChange={(on) => act(api.setLlm(on))} /></span>}
         <span className="grow" />
+        <div className="seg" role="group" aria-label="Тема оформления">
+          <button aria-pressed={theme === "light"} onClick={() => setTheme("light")}>Светлая</button>
+          <button aria-pressed={theme === "dark"} onClick={() => setTheme("dark")}>Тёмная</button>
+        </div>
+        <button className="btn" data-tour="help" onClick={() => { setMenu(null); setFocus(null); setTour(true); }}>Как пользоваться</button>
         {docs.length > 0 && (
-          <div className="pop-anchor" ref={menuRef}>
+          <div className="pop-anchor" ref={menuRef} data-tour="docs">
             <button className="btn" aria-expanded={menu === "docs"} onClick={() => setMenu(menu === "docs" ? null : "docs")}>
               Документы <span className="mono muted">{docs.length}</span> ▾
             </button>
@@ -110,7 +142,7 @@ export default function App() {
           </div>
         )}
         {/* на стартовом экране загрузка уже в центре — в шапке не дублируем */}
-        {docs.length > 0 && <button className="btn primary" onClick={topDrop.pick} disabled={busy}>{busy ? "Загрузка…" : "Загрузить TXT"}</button>}
+        {docs.length > 0 && <button className="btn primary" data-tour="upload" onClick={topDrop.pick} disabled={busy}>{busy ? "Загрузка…" : "Загрузить TXT"}</button>}
         {topDrop.picker}
       </header>
       {err && <div className="answer"><span className="err" role="alert">{err}</span></div>}
@@ -120,6 +152,7 @@ export default function App() {
       {reg && docs.length > 0 && (
         <main>
           <div className="toolbar" role="toolbar" aria-label="Фильтры и вид таблицы">
+            <div className="tool-group" data-tour="filters">
             <div className="seg" role="group" aria-label="Статус">
               {(["all", "review", "pending"] as View[]).map((v) => (
                 <button key={v} aria-pressed={filter.view === v} onClick={() => setFilter({ ...filter, view: v })}>
@@ -135,6 +168,7 @@ export default function App() {
               onChange={(e) => setFilter({ ...filter, before: e.target.value || null })} />
             <input className="input" style={{ width: 200 }} placeholder="Номер или поставщик" aria-label="Поиск" value={filter.q}
               onChange={(e) => setFilter({ ...filter, q: e.target.value })} />
+            </div>
             {!isDefault && <>
               <button className="btn" onClick={() => setSaved([...saved.filter((s) => s.name !== filterName(filter)), { ...filter, name: filterName(filter) }])}>Сохранить фильтр</button>
               <button className="linkbtn" onClick={() => setFilter({ view: "all", before: null, q: "" })}>Сбросить</button>
@@ -147,6 +181,7 @@ export default function App() {
               </span>
             ))}
             <span style={{ flex: 1 }} />
+            <div className="tool-group" data-tour="view">
             <div className="pop-anchor">
               <button className="btn" aria-expanded={menu === "cols"} onClick={() => setMenu(menu === "cols" ? null : "cols")}>Колонки ▾</button>
               {menu === "cols" && (
@@ -157,6 +192,7 @@ export default function App() {
             <div className="seg" role="group" aria-label="Плотность">
               <button aria-pressed={density === "compact"} onClick={() => setDensity("compact")}>Компактно</button>
               <button aria-pressed={density === "comfortable"} onClick={() => setDensity("comfortable")}>Стандартно</button>
+            </div>
             </div>
           </div>
 
@@ -171,7 +207,7 @@ export default function App() {
             <span>{rows.length} из {allRows.length} договоров · на {fmtDate(asOf)}</span>
             {/* видна только когда таблица в фокусе — иначе клавиши ничего не делают и подсказка сбивает с толку */}
             <span className="keys">Клавиатура: ↑ ↓ ← → — выбрать ячейку · Enter — открыть основание · Esc — закрыть</span>
-            <span style={{ marginLeft: "auto" }}>Извлечение: правила{reg.llm.enabled ? ` + LLM ${reg.llm.model}` : " · LLM выключена"}</span>
+            <span style={{ marginLeft: "auto" }}>Извлечение: правила{reg.llm.enabled ? ` + LLM-сверка (${reg.llm.model})` : " · LLM-сверка выключена"}</span>
           </footer>
         </main>
       )}
@@ -181,6 +217,7 @@ export default function App() {
           onClose={() => setFocus(null)} onFocus={setFocus} />
       )}
       <Confirm state={confirm} onClose={() => setConfirm(null)} />
+      <Tour open={tour} onClose={() => setTour(false)} api={tourApi} />
     </div>
   );
 }
