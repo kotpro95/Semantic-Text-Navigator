@@ -61,11 +61,22 @@ export function AskBar({ asOf, onOpen }: { asOf: string; onOpen: (f: Focus) => v
   const [ans, setAns] = useState<Answer | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // подсказки под полем: вопросы из задания, фильтруются по введённому тексту
+  const [open, setOpen] = useState(false);
+  const [hi, setHi] = useState(-1);
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const suggestions = PRESET_QUESTIONS.filter((p) => words.every((w) => p.toLowerCase().includes(w)) && p !== q);
 
   const run = async (text: string) => {
-    if (!text.trim()) { setErr("Введите вопрос или выберите из списка"); return; }
-    setQ(text); setErr(null); setBusy(true);
+    if (!text.trim()) { setErr("Введите вопрос или выберите подсказку под полем"); setOpen(true); return; }
+    setQ(text); setErr(null); setBusy(true); setOpen(false); setHi(-1);
     try { setAns(await api.ask(text, asOf)); } catch (e) { setAns(null); setErr((e as Error).message); } finally { setBusy(false); }
+  };
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown" && suggestions.length) { e.preventDefault(); setOpen(true); setHi((h) => (h + 1) % suggestions.length); }
+    else if (e.key === "ArrowUp" && suggestions.length) { e.preventDefault(); setHi((h) => (h <= 0 ? suggestions.length - 1 : h - 1)); }
+    else if (e.key === "Escape") { setOpen(false); setHi(-1); }
+    else if (e.key === "Enter" && open && hi >= 0) { e.preventDefault(); run(suggestions[hi]); }
   };
   const cite = (contract: string, field: string, ev: Evidence, pending = false) => (
     <div className={`cite ${pending ? "pending" : ""}`} key={`${ev.doc_id}-${ev.paragraph}`}>
@@ -77,15 +88,30 @@ export function AskBar({ asOf, onOpen }: { asOf: string; onOpen: (f: Focus) => v
   return (
     <>
       <form className="ask" onSubmit={(e) => { e.preventDefault(); run(q); }}>
-        <label htmlFor="ask" className="field" style={{ fontWeight: 600, color: "var(--ink)" }}>Вопрос</label>
-        <input id="ask" className="input" list="ask-presets" value={q} onChange={(e) => { setQ(e.target.value); setErr(null); }}
-          placeholder="Какова сумма договора STN-102?  ·  срок поставки STN-101 на 1 марта 2026" />
-        <datalist id="ask-presets">{PRESET_QUESTIONS.map((p) => <option key={p} value={p} />)}</datalist>
-        <select className="input" style={{ width: 210 }} value="" aria-label="Вопросы из задания" onChange={(e) => e.target.value && run(e.target.value)}>
-          <option value="">Вопросы из задания…</option>
-          {PRESET_QUESTIONS.map((p, i) => <option key={p} value={p}>{i + 1}. {p.length > 46 ? p.slice(0, 44) + "…" : p}</option>)}
-        </select>
-        <button className="btn primary" disabled={busy}>{busy ? "Считаю…" : "Ответить"}</button>
+        <label htmlFor="ask" className="ask-label">
+          Спросите по загруженным договорам
+          <span>ответ строится по документам и приходит с цитатой-основанием</span>
+        </label>
+        <div className="ask-row">
+          <div className="combo">
+            <input id="ask" className="ask-input" value={q} autoComplete="off"
+              role="combobox" aria-expanded={open && suggestions.length > 0} aria-controls="ask-list"
+              aria-activedescendant={hi >= 0 ? `ask-opt-${hi}` : undefined}
+              onChange={(e) => { setQ(e.target.value); setErr(null); setOpen(true); setHi(-1); }}
+              onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 120)} onKeyDown={onKey}
+              placeholder="Например: какова сумма договора STN-102? · срок поставки STN-101 на 1 марта 2026" />
+            {open && suggestions.length > 0 && (
+              <ul id="ask-list" className="combo-list" role="listbox" aria-label="Вопросы из задания">
+                <li className="combo-head" aria-hidden="true">Вопросы из задания</li>
+                {suggestions.map((s, i) => (
+                  <li key={s} id={`ask-opt-${i}`} role="option" aria-selected={hi === i} className={hi === i ? "on" : ""}
+                    onMouseDown={(e) => { e.preventDefault(); run(s); }} onMouseEnter={() => setHi(i)}>{s}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <button className="btn primary ask-btn" disabled={busy}>{busy ? "Считаю…" : "Ответить"}</button>
+        </div>
       </form>
       {err && <div className="answer"><span className="err" role="alert">{err}</span></div>}
       {ans && (

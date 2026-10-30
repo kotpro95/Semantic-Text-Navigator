@@ -83,8 +83,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
 
 /* Ask */
-.ask { display: flex; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--bg-2); align-items: center; }
-.ask .input { flex: 1; height: 32px; }
+.ask { display: grid; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--bg-2); }
+.ask-label { display: flex; align-items: baseline; gap: 10px; font-size: 14px; font-weight: 600; color: var(--ink); }
+.ask-label span { font-size: 12px; font-weight: 400; color: var(--ink-3); }
+.ask-row { display: flex; gap: 8px; }
+.combo { position: relative; flex: 1; }
+.ask-input { width: 100%; height: 44px; padding: 0 14px; border: 1px solid var(--ink); background: var(--bg); font: 15px var(--sans); color: var(--ink); border-radius: 0; }
+.ask-input::placeholder { color: var(--ink-3); }
+.ask-btn { height: 44px; padding: 0 22px; font-size: 14px; }
+.combo-list { position: absolute; z-index: 35; left: 0; right: 0; top: 100%; margin: 0; padding: 4px 0; list-style: none; background: var(--bg); border: 1px solid var(--ink); border-top: 0; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+.combo-list li { padding: 8px 14px; font-size: 14px; cursor: pointer; }
+.combo-list li.on { background: var(--bg-2); }
+.combo-list .combo-head { padding: 6px 14px 4px; font: 500 11px var(--mono); color: var(--ink-3); cursor: default; }
 .answer { padding: 10px 16px 12px; border-bottom: 1px solid var(--line); display: grid; gap: 6px; background: var(--bg); }
 .answer .a { font-size: 14px; font-weight: 500; }
 .answer .q { color: var(--ink-3); font-size: 12px; }
@@ -93,7 +103,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .cite.pending { border-left: 2px dashed var(--ink); padding-left: 8px; }
 
 /* Data table */
-.grid-wrap { overflow: auto; max-height: calc(100vh - 52px - 49px - 53px); }
+.grid-wrap { overflow: auto; max-height: calc(100vh - 52px - 49px - 100px); }
 table.grid { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; }
 .grid th, .grid td { height: var(--row); padding: 0 10px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs); }
 .grid th { position: sticky; top: 0; z-index: 2; background: var(--bg); font: 500 11px var(--mono); color: var(--ink-3); border-bottom: 1px solid var(--ink); user-select: none; }
