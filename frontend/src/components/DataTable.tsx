@@ -222,6 +222,12 @@ export function ColumnsMenu({ order, setOrder, hidden, setHidden, onReset }: {
   return (
     <div className="pop" role="dialog" aria-label="Настройка колонок">
       <h4>Колонки</h4>
+      <label className="row">
+        <input type="checkbox" checked={hidden.length === 0}
+          ref={(el) => { if (el) el.indeterminate = hidden.length > 0 && hidden.length < order.length - 1; }}
+          onChange={(e) => setHidden(e.target.checked ? [] : order.filter((id) => id !== "number"))} />
+        <span className="grow" style={{ fontWeight: 600 }}>Выделить все</span>
+      </label>
       {order.map((id, i) => {
         const c = COLUMNS.find((x) => x.id === id)!;
         const fixed = id === "number";
