@@ -47,6 +47,7 @@ export type DeliveryRow = {
 export type Answer = {
   kind: "field" | "delivery_before"; question: string; text: string; as_of: string; contract: string | null;
   field: FieldView | null; pending: PendingChange[]; matches: DeliveryRow[]; excluded: DeliveryRow[]; evidence: Evidence[];
+  understood: string; parsed_by: string;
 };
 
 async function req<T>(url: string, init?: RequestInit): Promise<T> {

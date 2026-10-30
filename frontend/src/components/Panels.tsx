@@ -102,7 +102,7 @@ export function AskBar({ asOf, onOpen }: { asOf: string; onOpen: (f: Focus) => v
               aria-activedescendant={hi >= 0 ? `ask-opt-${hi}` : undefined}
               onChange={(e) => { setQ(e.target.value); setErr(null); setOpen(true); setHi(-1); }}
               onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 120)} onKeyDown={onKey}
-              placeholder="Например: какова сумма договора STN-102? · срок поставки STN-101 на 1 марта 2026" />
+              placeholder="Спросите своими словами: «сколько платим Контур Электро?», «когда привезут по STN-101?», «что поставят раньше апреля?»" />
             {open && suggestions.length > 0 && (
               <ul id="ask-list" className="combo-list" role="listbox" aria-label="Вопросы из задания">
                 <li className="combo-head" aria-hidden="true">Вопросы из задания</li>
@@ -133,7 +133,8 @@ export function AskBar({ asOf, onOpen }: { asOf: string; onOpen: (f: Focus) => v
               {m.pending.map((p) => cite(m.contract, "delivery", p.evidence, true))}
             </Fragment>
           ))}
-          <span className="q">На {fmtDate(ans.as_of)} · {ans.question}</span>
+          {/* как понят вопрос — пользователь видит интерпретацию и может переформулировать */}
+          <span className="q">Понял как: <b>{ans.understood || `на ${fmtDate(ans.as_of)}`}</b> · разобрал: {ans.parsed_by}</span>
         </div>
       )}
     </>

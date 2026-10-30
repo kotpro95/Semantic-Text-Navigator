@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from . import llm
 from .extractors import REGISTRY
 from .models import ContractView, Document, Flag
-from .queries import Answer, delivery_before, field_answer, parse_question
+from .queries import FIELD_NAMES, Answer, delivery_before, describe, field_answer, parse_question, supplier_index
 from .resolver import build_registry
 from .store import store
 
@@ -162,16 +162,36 @@ def query(type: str = Query(..., pattern="^(field|delivery_before)$"),
 
 @router.get("/ask", response_model=Answer)
 def ask(q: str, as_of: date = Query(DEFAULT_AS_OF)):
-    p = parse_question(q, as_of)
+    """Свободный вопрос → структурный запрос → ответ правил с цитатами.
+    1) правила: синонимы, словоформы, поставщик → договор; 2) не поняли — LLM (если включена);
+    3) не поняла и она — просим уточнить. Модель только разбирает вопрос, но не отвечает."""
+    base_views, _ = build_registry(store.all(), as_of)
+    p = parse_question(q, as_of, supplier_index(base_views))
+    parsed_by = "правила"
+    if not p["ok"]:
+        contracts = [(v.number, v.fields["supplier"].display or "") for v in base_views]
+        m = llm.parse_question(q, contracts)
+        if m and m["type"] == "delivery_before":
+            parsed_by, p = f"LLM ({llm.MODEL})", {"type": "delivery_before", "date": m["date"], "as_of": as_of, "ok": True}
+        elif m:
+            # объединяем: что поняли правила — оставляем, недостающее берём у модели
+            contract = p.get("contract") or m["contract"]
+            field = p.get("field") or m["field"]
+            parsed_by = "правила + LLM" if (p.get("contract") or p.get("field")) else f"LLM ({llm.MODEL})"
+            p = {"type": "field", "contract": contract, "field": field,
+                 "as_of": p.get("as_of") if p.get("as_of") != as_of else (m["date"] or as_of), "ok": bool(contract and field)}
+    if not p["ok"]:
+        hint = "Например: «Какова сумма договора STN-102?», «Когда поставка по Контур Электро?», «Какие поставки раньше 1 апреля 2026?»"
+        if p["type"] == "field" and p.get("contract") and not p.get("field"):
+            raise HTTPException(422, f"Понял договор {p['contract']}, но не понял, что именно нужно: сумма, срок поставки, неустойка или поставщик?")
+        if p["type"] == "field" and p.get("field") and not p.get("contract"):
+            raise HTTPException(422, f"Понял поле «{FIELD_NAMES[p['field']]}», но не понял договор. Укажите номер или поставщика. {hint}")
+        raise HTTPException(422, f"Не понял вопрос. {hint}")
     if p["type"] == "delivery_before":
-        if not p["date"]:
-            raise HTTPException(422, "Укажите дату: «раньше 1 апреля 2026»")
         views, _ = _views(as_of)
         a = delivery_before(views, p["date"], as_of)
     else:
-        if not p["contract"] or not p["field"]:
-            raise HTTPException(422, "Не понял вопрос. Укажите номер договора и поле: сумма, срок поставки, неустойка, поставщик")
         views, _ = _views(p["as_of"])
         a = field_answer(views, p["contract"], p["field"], p["as_of"])
-    a.question = q
+    a.question, a.understood, a.parsed_by = q, describe(p), parsed_by
     return a

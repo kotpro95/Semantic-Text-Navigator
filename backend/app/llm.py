@@ -126,6 +126,46 @@ def call_model(text: str) -> dict:
     return json.loads(r.json()["response"])
 
 
+QUESTION_PROMPT = """Ты переводишь вопрос закупщика в структурный запрос. Верни ТОЛЬКО JSON:
+{{"type": "field" | "delivery_before" | "unknown", "contract": "<номер договора из списка или null>",
+ "field": "amount" | "delivery" | "penalty" | "supplier" | null, "date": "<ДД.ММ.ГГГГ или null>"}}
+amount — сумма/стоимость договора; delivery — срок поставки; penalty — неустойка; supplier — поставщик.
+delivery_before — вопрос «какие договоры со сроком поставки раньше даты» (date обязательна).
+date для field — дата, на которую спрашивают (если указана). Не уверен — "type": "unknown". Ничего не выдумывай.
+Договоры: {contracts}
+Вопрос: {question}"""
+
+
+def parse_question(question: str, contracts: list[tuple[str, str]]) -> dict | None:
+    """Разбор вопроса моделью — запасной путь, когда правила не поняли. Отвечать модель не может:
+    она только возвращает договор/поле/дату, ответ строят правила с цитатами.
+    Результат проверяется: договор — из загруженных, поле — из известных, дата — валидная."""
+    if not _enabled or not availability()["available"]:
+        return None
+    listing = "; ".join(f"{n} — {s}" for n, s in contracts)
+    try:
+        r = httpx.post(f"{URL}/api/generate", timeout=120, json={
+            "model": MODEL, "prompt": QUESTION_PROMPT.format(contracts=listing, question=question),
+            "format": "json", "stream": False, "keep_alive": "30m",
+            "options": {"temperature": 0, "num_ctx": 1024, "num_predict": 80}})
+        r.raise_for_status()
+        data = json.loads(r.json()["response"])
+    except Exception:
+        return None
+    numbers = {n for n, _ in contracts}
+    kind = data.get("type")
+    d = parse_date(str(data.get("date") or ""))
+    if kind == "delivery_before" and d:
+        return {"type": "delivery_before", "date": d}
+    if kind == "field":
+        # частичный ответ тоже полезен: правила могли понять договор, а модель — поле (и наоборот)
+        contract = data.get("contract") if data.get("contract") in numbers else None
+        field = data.get("field") if data.get("field") in ("amount", "delivery", "penalty", "supplier") else None
+        if contract or field:
+            return {"type": "field", "contract": contract, "field": field, "date": d}
+    return None
+
+
 def reset_cache() -> None:
     with _lock:
         _jobs.clear()

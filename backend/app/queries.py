@@ -30,6 +30,8 @@ class Answer(BaseModel):
     matches: list[dict] = Field(default_factory=list)
     excluded: list[dict] = Field(default_factory=list)
     evidence: list[Evidence] = Field(default_factory=list)
+    understood: str = ""            # как понят вопрос: «STN-102 · сумма · на 10.03.2026»
+    parsed_by: str = "правила"      # кто разобрал вопрос: правила или LLM
 
 
 def _find(views: list[ContractView], number: str) -> ContractView | None:
@@ -95,26 +97,69 @@ def delivery_before(views: list[ContractView], before: date, as_of: date) -> Ans
     return Answer(kind="delivery_before", question=q, as_of=as_of, matches=matches, excluded=excluded, text=text)
 
 
-def parse_question(text: str, default_as_of: date) -> dict:
-    """Очень простой разбор текстового вопроса в параметры запроса. Не чат: только шаблоны."""
+# ---------- разбор свободного вопроса ----------
+# Не чат: фраза сводится к структурному запросу (договор + поле + дата), ответ строят
+# те же правила с цитатами. Сначала правила (синонимы, словоформы, поставщик → договор),
+# если не хватило — LLM (llm.parse_question), если и она не уверена — просим уточнить.
+
+FIELD_SYNONYMS = [  # сначала сильные признаки, затем слабые: «сумма поставки» — сумма, «сколько до поставки» — срок
+    ("penalty", r"неустойк|\bпен[иья]\b|штраф"),
+    ("supplier", r"поставщик|контрагент|кто\s+поставля|с\s+кем"),
+    ("amount", r"сумм|стоимост|\bцен[аыуе]?\b|плат|деньг|\bруб"),
+    ("delivery", r"срок|привез|доставк|отгруз|\bкогда\b"),
+    ("delivery", r"постав(?!щик)"),
+    ("amount", r"сколько|стоит|обойд|затрат"),
+]
+FIELD_NAMES = {"amount": "сумма", "delivery": "срок поставки", "penalty": "неустойка", "supplier": "поставщик"}
+BEFORE_RE = re.compile(r"раньше|ранее|прежде|не\s+позднее|\bдо\b", re.I)
+MONTH_ONLY_RE = re.compile(r"(?:до|раньше|ранее|к)\s+(январ|феврал|март|апрел|ма[йя]|июн|июл|август|сентябр|октябр|ноябр|декабр)\w*(?:\s+(\d{4}))?", re.I)
+
+
+def _stem(w: str) -> str:
+    return w[:5] if len(w) > 5 else w
+
+
+def supplier_index(views: list[ContractView]) -> dict[str, list[str]]:
+    """номер договора → значимые основы слов из названия поставщика («контур», «элект»)."""
+    out = {}
+    for v in views:
+        name = (v.fields["supplier"].display or "")
+        inner = re.findall(r"«([^»]+)»", name) or [name]
+        words = [w for w in re.findall(r"[а-яёa-z]+", inner[0].lower()) if len(w) > 3]
+        if words:
+            out[v.number] = [_stem(w) for w in words]
+    return out
+
+
+def parse_question(text: str, default_as_of: date, suppliers: dict[str, list[str]] | None = None) -> dict:
     low = text.lower()
-    dates = []
+    dates: list[date] = []
     for m in TEXT_DATE_RE.finditer(low):
         mon = next(v for k, v in MONTHS.items() if m.group(2).startswith(k))
         dates.append(date(int(m.group(3)), mon, int(m.group(1))))
     if d := parse_date(text):
         dates.append(d)
+    if not dates and (mm := MONTH_ONLY_RE.search(low)):  # «до апреля» → 01.04 того же года
+        mon = next(v for k, v in MONTHS.items() if mm.group(1).startswith(k))
+        dates.append(date(int(mm.group(2) or default_as_of.year), mon, 1))
+
     num = CONTRACT_NO_RE.search(text.upper())
-    if re.search(r"раньше|до\s|ранее", low) and "постав" in low and not num:
-        return {"type": "delivery_before", "date": dates[0] if dates else None, "as_of": default_as_of}
-    field = None
-    if re.search(r"сумм|стоимост|цен", low):
-        field = "amount"
-    elif re.search(r"срок|постав", low):
-        field = "delivery"
-    elif "неустойк" in low or "пен" in low:
-        field = "penalty"
-    elif "поставщик" in low:
-        field = "supplier"
-    return {"type": "field", "contract": num.group(1) if num else None, "field": field,
-            "as_of": dates[0] if (dates and field) else default_as_of}
+    contract = num.group(1) if num else None
+    if not contract and suppliers:
+        words = re.findall(r"[а-яёa-z]+", low)
+        hits = [n for n, stems in suppliers.items() if any(any(w.startswith(st) for w in words) for st in stems)]
+        if len(hits) == 1:
+            contract = hits[0]
+    field = next((f for f, rx in FIELD_SYNONYMS if re.search(rx, low)), None)
+
+    if not contract and dates and BEFORE_RE.search(low) and field in (None, "delivery"):
+        return {"type": "delivery_before", "date": dates[0], "as_of": default_as_of, "ok": True}
+    as_of = dates[0] if (dates and contract) else default_as_of
+    return {"type": "field", "contract": contract, "field": field, "as_of": as_of, "ok": bool(contract and field)}
+
+
+def describe(p: dict) -> str:
+    from .parsing.segment import fmt_date as fd
+    if p["type"] == "delivery_before":
+        return f"договоры со сроком поставки раньше {fd(p['date'])} · на {fd(p['as_of'])}"
+    return f"{p['contract']} · {FIELD_NAMES.get(p['field'], p['field'])} · на {fd(p['as_of'])}"
