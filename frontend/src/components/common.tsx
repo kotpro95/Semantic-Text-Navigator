@@ -35,7 +35,7 @@ export function contractStatus(c: ContractView, registryFields: string[]): Statu
 }
 
 export function StatusLabel({ s }: { s: Status }) {
-  return <span className={`st ${s}`}><i aria-hidden="true">{STATUS[s].icon}</i>{STATUS[s].label}</span>;
+  return <span className={`st ${s}`}><i aria-hidden="true" />{STATUS[s].label}</span>;
 }
 
 export function docStatus(d: DocSummary, asOf: string): [Status, string] {

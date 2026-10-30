@@ -34,10 +34,12 @@ function fieldCell(f: FieldView | undefined) {
     </>
   );
 }
+// «STN-101» → мелкий серый префикс + крупный номер, как в варианте A
+const numCell = (n: string) => { const i = n.lastIndexOf("-"); return <span className="cnum"><span>{n.slice(0, i + 1)}</span><b>{n.slice(i + 1)}</b></span>; };
 const fieldText = (f: FieldView | undefined) => (!f || f.status === "missing" ? "нет данных" : f.display ?? "");
 
 export const COLUMNS: Col[] = [
-  { id: "number", label: "Договор", width: 104, sort: (r) => r.c.number, render: (r) => r.c.number, text: (r) => r.c.number },
+  { id: "number", label: "Договор", width: 104, sort: (r) => r.c.number, render: (r) => numCell(r.c.number), text: (r) => r.c.number },
   { id: "supplier", label: "Поставщик", width: 200, field: "supplier", sort: (r) => r.c.fields.supplier.display ?? "", render: (r) => fieldCell(r.c.fields.supplier), text: (r) => fieldText(r.c.fields.supplier) },
   { id: "amount", label: "Сумма, ₽ с НДС", hint: TERMS.amount, width: 150, align: "r", field: "amount", sort: (r) => Number(r.c.fields.amount.value ?? -1), render: (r) => fieldCell(r.c.fields.amount), text: (r) => fieldText(r.c.fields.amount) },
   { id: "delivery", label: "Срок поставки", hint: TERMS.delivery, width: 140, align: "r", field: "delivery", sort: (r) => r.c.fields.delivery.value ?? "9999", render: (r) => fieldCell(r.c.fields.delivery), text: (r) => fieldText(r.c.fields.delivery) },

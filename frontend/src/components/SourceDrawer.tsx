@@ -5,10 +5,10 @@ import { Hint, TERMS, shortDoc } from "./common";
 import type { Focus } from "./DataTable";
 
 const STEP = {
-  base: { icon: "○", text: "исходное" },
-  applied: { icon: "✓", text: "действует" },
-  superseded: { icon: "○", text: "заменено" },
-  pending: { icon: "◐", text: "не согласовано" },
+  base: { icon: "–", text: "исходное" },
+  applied: { icon: "■", text: "действует" },
+  superseded: { icon: "–", text: "заменено" },
+  pending: { icon: "□", text: "не согласовано" },
 } as const;
 
 export function SourceDrawer({ focus, contract, asOf, onClose, onFocus }: {
@@ -67,8 +67,8 @@ export function SourceDrawer({ focus, contract, asOf, onClose, onFocus }: {
             <div className="bigval">
               {field.status === "missing" ? <span style={{ color: "var(--signal)", fontFamily: "var(--sans)" }}>нет данных</span> : <span>{field.display}</span>}
             </div>
-            <span className={`st ${statusCls}`} style={{ fontWeight: 400 }}>
-              <i aria-hidden="true">{statusCls === "ok" ? "✓" : "!"}</i>{statusText}
+            <span className={`st ${statusCls === "ok" ? "pending" : "review"}`} style={{ fontWeight: 400 }}>
+              <i aria-hidden="true" style={statusCls === "ok" ? { background: "var(--ink)" } : undefined} />{statusText}
             </span>
             {field.note && field.status !== "changed" && <span className="muted" style={{ fontSize: 12.5 }}>{field.note}</span>}
           </div>
@@ -120,7 +120,7 @@ export function SourceDrawer({ focus, contract, asOf, onClose, onFocus }: {
               );
             })}
           </div>
-          <div className="legend"><span>▮ цитата-основание</span><span style={{ color: "var(--ok)" }}>▮ статус и дата вступления</span></div>
+          <div className="legend"><span>▮ цитата-основание</span><span>▮ статус и дата вступления (серым)</span></div>
         </div>
 
         {field && field.rejected.length > 0 && (
