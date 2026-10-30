@@ -99,8 +99,11 @@ export function Tour({ open, onClose, api }: { open: boolean; onClose: () => voi
     const el = elRef.current;
     if (!el) return setRect(null);
     const r = el.getBoundingClientRect();
-    // подсветка ровно по границам элемента, рамка внутри — не налезает на соседей и края экрана
-    setRect({ x: r.left, y: r.top, w: r.width, h: r.height });
+    // подсветка по границам элемента, рамка внутри. Если у элемента нет своих полей
+    // (заголовок, подпись, переключатель) — отступ 6px, иначе рамка ляжет на текст
+    const cs = getComputedStyle(el as HTMLElement);
+    const pad = parseFloat(cs.paddingLeft) >= 6 || el.matches("td, th, .grid-wrap") || el.closest(".drawer") ? 0 : 6;
+    setRect({ x: r.left - pad, y: r.top - pad, w: r.width + pad * 2, h: r.height + pad * 2 });
   }, []);
 
   useEffect(() => { if (open) setI(0); }, [open]);
