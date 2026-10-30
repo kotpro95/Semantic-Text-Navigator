@@ -128,6 +128,25 @@ export function DataTable({ rows, order, hidden, focus, onOpen }: {
   };
   const autoFit = (id: string) => setWidths((w) => { const n = { ...w }; delete n[id]; return n; });
 
+  // Высота строки — как в Excel: тянем нижнюю границу в колонке «Договор».
+  // Значение: px, или AUTO — по содержимому (текст переносится). Нет записи — обычная высота.
+  const AUTO = -1;
+  const [rowH, setRowH] = useStored<Record<string, number>>("tbl.rowh", {});
+  const startRowResize = (num: string, e: React.MouseEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    const tr = (e.currentTarget as HTMLElement).closest("tr")!;
+    const startY = e.clientY, startH = tr.getBoundingClientRect().height;
+    const move = (ev: MouseEvent) => setRowH((h) => ({ ...h, [num]: Math.max(28, Math.round(startH + ev.clientY - startY)) }));
+    const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+    window.addEventListener("mousemove", move); window.addEventListener("mouseup", up);
+  };
+  // двойной клик: обычная → по содержимому → обычная
+  const toggleRowFit = (num: string) => setRowH((h) => {
+    const n = { ...h };
+    if (n[num] === undefined) n[num] = AUTO; else delete n[num];
+    return n;
+  });
+
   return (
     <div className="grid-wrap" ref={wrap} tabIndex={0} onKeyDown={onKey} aria-label="Реестр договоров. Стрелки — перемещение, Enter — открыть основание">
       <table className="grid" role="grid" aria-rowcount={sorted.length}>
@@ -151,7 +170,9 @@ export function DataTable({ rows, order, hidden, focus, onOpen }: {
         </thead>
         <tbody>
           {sorted.map((r, ri) => (
-            <tr key={r.c.number} className={sel.r === ri || focus?.contract === r.c.number ? "sel" : ""}
+            <tr key={r.c.number}
+              className={`${sel.r === ri || focus?.contract === r.c.number ? "sel" : ""} ${rowH[r.c.number] !== undefined ? "tall" : ""}`}
+              style={rowH[r.c.number] > 0 ? { height: rowH[r.c.number] } : undefined}
               onClick={() => setSel((s) => ({ ...s, r: ri }))} onDoubleClick={() => open(r, undefined)}>
               {visible.map((c, ci) => {
                 const cls = `${ci === 0 ? "sticky num" : ""} ${c.align ?? ""} ${c.field ? "cell-btn" : ""}`;
@@ -162,6 +183,12 @@ export function DataTable({ rows, order, hidden, focus, onOpen }: {
                       ? <button onClick={(e) => { e.stopPropagation(); setSel({ r: ri, c: ci }); open(r, c); }}
                           aria-label={`${c.label} ${r.c.number}: ${c.text(r)}. Открыть основание`}>{c.render(r)}</button>
                       : c.render(r)}
+                    {ci === 0 && (
+                      <span className="rz-row" onMouseDown={(e) => startRowResize(r.c.number, e)}
+                        onClick={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => { e.stopPropagation(); toggleRowFit(r.c.number); }}
+                        title="Потяните, чтобы изменить высоту строки; двойной клик — по содержимому / обратно" />
+                    )}
                   </td>
                 );
               })}
@@ -200,7 +227,7 @@ export function ColumnsMenu({ order, setOrder, hidden, setHidden, onReset }: {
           </label>
         );
       })}
-      <div className="row"><button className="linkbtn" onClick={onReset}>Сбросить колонки и ширины</button></div>
+      <div className="row"><button className="linkbtn" onClick={onReset}>Сбросить колонки, ширины и высоты строк</button></div>
     </div>
   );
 }

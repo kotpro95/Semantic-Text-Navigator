@@ -151,7 +151,7 @@ export default function App() {
               <button className="btn" aria-expanded={menu === "cols"} onClick={() => setMenu(menu === "cols" ? null : "cols")}>Колонки ▾</button>
               {menu === "cols" && (
                 <ColumnsMenu order={order} setOrder={setOrder} hidden={hidden} setHidden={setHidden}
-                  onReset={() => { setOrder(DEFAULT_ORDER); setHidden(DEFAULT_HIDDEN); try { localStorage.removeItem("tbl.widths"); } catch { /* */ } setTableKey((k) => k + 1); }} />
+                  onReset={() => { setOrder(DEFAULT_ORDER); setHidden(DEFAULT_HIDDEN); try { localStorage.removeItem("tbl.widths"); localStorage.removeItem("tbl.rowh"); } catch { /* */ } setTableKey((k) => k + 1); }} />
               )}
             </div>
             <div className="seg" role="group" aria-label="Плотность">
@@ -169,7 +169,8 @@ export default function App() {
 
           <footer className="foot">
             <span>{rows.length} из {allRows.length} договоров · на {fmtDate(asOf)}</span>
-            <span><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> ячейка · <kbd>Enter</kbd> основание · <kbd>Esc</kbd> закрыть</span>
+            {/* видна только когда таблица в фокусе — иначе клавиши ничего не делают и подсказка сбивает с толку */}
+            <span className="keys">Клавиатура: ↑ ↓ ← → — выбрать ячейку · Enter — открыть основание · Esc — закрыть</span>
             <span style={{ marginLeft: "auto" }}>Извлечение: правила{reg.llm.enabled ? ` + LLM ${reg.llm.model}` : " · LLM выключена"}</span>
           </footer>
         </main>
