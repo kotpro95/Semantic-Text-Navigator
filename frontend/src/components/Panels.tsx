@@ -61,6 +61,8 @@ export function AskBar({ asOf, onOpen }: { asOf: string; onOpen: (f: Focus) => v
   const [ans, setAns] = useState<Answer | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // счётчик ответов: новый key перезапускает подсветку, даже если ответ тот же
+  const [tick, setTick] = useState(0);
   // подсказки под полем: вопросы из задания, фильтруются по введённому тексту
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(-1);
@@ -70,7 +72,7 @@ export function AskBar({ asOf, onOpen }: { asOf: string; onOpen: (f: Focus) => v
   const run = async (text: string) => {
     if (!text.trim()) { setErr("Введите вопрос или выберите подсказку под полем"); setOpen(true); return; }
     setQ(text); setErr(null); setBusy(true); setOpen(false); setHi(-1);
-    try { setAns(await api.ask(text, asOf)); } catch (e) { setAns(null); setErr((e as Error).message); } finally { setBusy(false); }
+    try { setAns(await api.ask(text, asOf)); setTick((t) => t + 1); } catch (e) { setAns(null); setErr((e as Error).message); } finally { setBusy(false); }
   };
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown" && suggestions.length) { e.preventDefault(); setOpen(true); setHi((h) => (h + 1) % suggestions.length); }
@@ -111,12 +113,12 @@ export function AskBar({ asOf, onOpen }: { asOf: string; onOpen: (f: Focus) => v
               </ul>
             )}
           </div>
-          <button className="btn primary ask-btn" disabled={busy}>{busy ? "Считаю…" : "Ответить"}</button>
+          <button className="btn primary ask-btn" disabled={busy} title="Или нажмите Enter в поле">{busy ? "Считаю…" : <>Ответить <span aria-hidden="true">↵</span></>}</button>
         </div>
       </form>
       {err && <div className="answer"><span className="err" role="alert">{err}</span></div>}
       {ans && (
-        <div className="answer" aria-live="polite">
+        <div className="answer flash" key={tick} aria-live="polite">
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
             <span className="a">{ans.text}</span>
             <button className="linkbtn" onClick={() => setAns(null)}>Скрыть</button>
