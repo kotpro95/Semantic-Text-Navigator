@@ -258,7 +258,10 @@ table.grid { border-collapse: separate; border-spacing: 0; width: 100%; table-la
 .tour-cursor.click svg { transform: scale(.85); }
 .tour-ripple { position: absolute; left: 3px; top: 3px; width: 34px; height: 34px; margin: -17px; border-radius: 50%; border: 2px solid var(--signal-mark); animation: tour-ripple .5s ease-out forwards; }
 @keyframes tour-ripple { from { transform: scale(.3); opacity: 1; } to { transform: scale(1.4); opacity: 0; } }
-.tour-hover { background-color: var(--bg-2) !important; }
+/* имитация наведения в туре — как настоящий :hover у этого типа элемента, без «засвета» */
+.tour-hover:not(.btn):not(.pop-anchor):not(.tool-group):not(label) { background-color: var(--bg-2); }
+.btn.tour-hover, .pop-anchor.tour-hover .btn { border-color: var(--ink); }
+.btn.primary.tour-hover { background: var(--ink-hover); }
 .tour-card { position: fixed; z-index: 203; pointer-events: auto; background: var(--bg); color: var(--ink); border: 1px solid var(--ink); padding: 16px 18px 14px; display: grid; gap: 8px;
   box-shadow: 0 12px 32px rgba(0,0,0,.28); transition: left .35s, top .35s, transform .35s; }
 .tour-card h3 { margin: 0; font-size: 16px; }
