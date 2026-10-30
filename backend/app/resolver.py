@@ -111,7 +111,7 @@ def build_contract(contract: Document, related: list[Document], as_of: date) -> 
 
     for f in fields.values():
         if f.status == FieldStatus.missing and REGISTRY[f.field].in_registry:
-            flags.append(Flag(level="review", text=f"{f.label}: нет данных — {f.note or 'не найдено'}"))
+            flags.append(Flag(level="review", text=f"{f.label.split(',')[0]} — нет данных. {f.note or 'Значение не найдено'}."))
 
     return ContractView(number=contract.contract_number or "?", doc_id=contract.id, filename=contract.filename,
                         fields=fields, pending=kept, flags=flags, related_docs=[d.id for d in related])

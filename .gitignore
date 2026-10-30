@@ -10,3 +10,4 @@ frontend/dist/
 ~$*
 *.docx
 примеры документов/
+*.tsbuildinfo

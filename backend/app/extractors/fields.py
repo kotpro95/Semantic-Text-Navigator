@@ -63,7 +63,9 @@ def amount(doc: Document, paras: list[Paragraph]) -> Extracted:
                          ambiguous=len(values) > 1, rejected=rejected)
     if absent:
         p, s = absent[0]
-        return Extracted(field="amount", missing_reason="Стоимость в тексте не указана",
+        reason = ("Стоимость указана в приложении, его текста нет в комплекте"
+                  if re.search(r"приложени", s, re.I) else "Стоимость в тексте не указана")
+        return Extracted(field="amount", missing_reason=reason,
                          evidence=[ev(doc, p, s) for p, s in absent], rejected=rejected)
     return Extracted(field="amount", missing_reason="Стоимость договора в тексте не найдена",
                      rejected=rejected)
