@@ -18,4 +18,5 @@ if DIST.exists():
 
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str):
-        return FileResponse(DIST / "index.html")
+        # index.html не кэшируем: после пересборки браузер сразу берёт новые хешированные стили и скрипты
+        return FileResponse(DIST / "index.html", headers={"Cache-Control": "no-cache"})
