@@ -99,7 +99,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .answer .q { color: var(--ink-3); font-size: 12px; }
 .cite { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; }
 .cite q { quotes: "«" "»"; color: var(--ink-2); }
-.cite.pending { border-left: 2px dashed var(--ink); padding-left: 8px; }
+.cite .st { flex: none; font-size: 12px; }
 
 /* Data table */
 .grid-wrap { overflow: auto; max-height: calc(100vh - 52px - 49px - 100px); }

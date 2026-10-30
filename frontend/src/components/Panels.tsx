@@ -80,6 +80,7 @@ export function AskBar({ asOf, onOpen }: { asOf: string; onOpen: (f: Focus) => v
   };
   const cite = (contract: string, field: string, ev: Evidence, pending = false) => (
     <div className={`cite ${pending ? "pending" : ""}`} key={`${ev.doc_id}-${ev.paragraph}`}>
+      {pending && <span className="st pending"><i aria-hidden="true" />не согласовано</span>}
       <q>{ev.quote}</q>
       <button className="linkbtn" onClick={() => onOpen({ contract, field, evidence: ev })}>{ev.filename} · абз. {ev.paragraph}</button>
     </div>
